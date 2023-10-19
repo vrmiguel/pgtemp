@@ -13,6 +13,7 @@ pub enum SubcommandEnum {
     New(New),
     Delete(Delete),
     Connect(Connect),
+    Connstring(Connstring),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -33,3 +34,8 @@ pub struct Delete {}
 /// Connect to the existing emporary Postgres database
 #[argh(subcommand, name = "connect")]
 pub struct Connect {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Display the connstring to connect to the active Postgres database
+#[argh(subcommand, name = "connstring")]
+pub struct Connstring {}

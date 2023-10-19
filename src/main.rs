@@ -54,7 +54,7 @@ impl PgTemp {
     pub fn new_db(&self, port: u32) -> Result<()> {
         let version = get_postgres_version()?;
         let db_path = format!("{}/db", self.config_dir);
-        
+
         ensure!(
             exists(&db_path).not(),
             "Cannot create a new DB, one still exists."
@@ -97,9 +97,13 @@ impl PgTemp {
         Ok(())
     }
 
+    pub fn conn_string(&self) -> Result<String> {
+        self.read_port()
+            .map(|port| format!("postgresql://localhost:{port}/postgres"))
+    }
+
     fn connect(&self) -> Result<()> {
-        let port = self.read_port()?;
-        let conn_string = format!("postgresql://localhost:{port}/postgres");
+        let conn_string = self.conn_string()?;
 
         run("psql", &[&conn_string])
     }
@@ -155,5 +159,10 @@ fn main() -> Result<()> {
         SubcommandEnum::New(New { port }) => pgtemp.new_db(port),
         SubcommandEnum::Delete(_) => pgtemp.delete(),
         SubcommandEnum::Connect(_) => pgtemp.connect(),
+        SubcommandEnum::Connstring(_) => {
+            let conn_string = pgtemp.conn_string()?;
+            println!("{conn_string}");
+            Ok(())
+        }
     }
 }
