@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 argh = "0.1.12"
+fs-err = "2.11.0"

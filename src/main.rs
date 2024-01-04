@@ -1,13 +1,11 @@
 mod cli;
 
-use std::{
-    fs::{self, File},
-    ops::Not,
-    path::Path,
-    process::Command,
-};
+use fs::File;
+use fs_err as fs;
 
-use anyhow::{bail, ensure, Context};
+use std::{ops::Not, path::Path, process::Command};
+
+use anyhow::{bail, ensure, Context, Ok};
 use cli::{New, SubcommandEnum, TopLevel};
 
 type Result<T = ()> = anyhow::Result<T>;
@@ -48,7 +46,26 @@ impl PgTemp {
     }
 
     fn clean_up(&self) -> Result<()> {
-        fs::remove_dir_all(&self.config_dir).map_err(Into::into)
+        if !exists(&self.config_dir) {
+            return Ok(());
+        }
+
+        fs::remove_dir_all(&self.config_dir)
+            .with_context(|| format!("Failed to remove {}", self.config_dir))
+    }
+
+    fn create_folders<P: AsRef<Path>>(&self, path: &P) -> Result<()> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::OpenOptions::new()
+            .create(true)
+            .open(path)
+            .with_context(|| format!("Failed to create database file ({})", path.display()))?;
+
+        Ok(())
     }
 
     pub fn new_db(&self, port: u32) -> Result<()> {
@@ -62,7 +79,7 @@ impl PgTemp {
 
         self.write_port(port)?;
 
-        fs::create_dir(&db_path)?;
+        self.create_folders(&db_path)?;
 
         let setup = || {
             run("initdb", &["-D", &db_path])?;
@@ -129,18 +146,18 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 fn get_postgres_version() -> Result<u8> {
     let output = Command::new("pg_config").arg("--version").output()?;
-    ensure!(output.status.success(), "fafiled to run pg_config");
+    ensure!(output.status.success(), "failed to run pg_config");
 
     let stdout = String::from_utf8(output.stdout)?;
 
-    let version = if stdout.contains("PostgreSQL 14") {
+    let version = if stdout.starts_with("PostgreSQL 14") {
         14
-    } else if stdout.contains("PostgreSQL 15") {
+    } else if stdout.starts_with("PostgreSQL 15") {
         15
-    } else if stdout.contains("PostgreSQL 16") {
+    } else if stdout.starts_with("PostgreSQL 16") {
         16
     } else {
-        bail!("Unknown Postgres version")
+        bail!("Unsupported Postgres version")
     };
 
     Ok(version)
