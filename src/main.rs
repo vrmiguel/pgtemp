@@ -57,19 +57,17 @@ impl PgTemp {
     fn create_folders<P: AsRef<Path>>(&self, path: &P) -> Result<()> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            if parent.exists().not() {
+                fs::create_dir(parent)?;
+            }
         }
-
-        fs::OpenOptions::new()
-            .create(true)
-            .open(path)
-            .with_context(|| format!("Failed to create database file ({})", path.display()))?;
 
         Ok(())
     }
 
     pub fn new_db(&self, port: u32) -> Result<()> {
         let version = get_postgres_version()?;
+        println!("Detected PostgreSQL {version}.");
         let db_path = format!("{}/db", self.config_dir);
 
         ensure!(
@@ -83,10 +81,12 @@ impl PgTemp {
 
         let setup = || {
             run("initdb", &["-D", &db_path])?;
+            println!("initdb successful.");
             run(
-                &format!("/usr/lib/postgresql/{version}/bin/pg_ctl"),
+                "pg_ctl",
                 &["-D", &db_path, "-o", &format!("-p {port} -k /tmp"), "start"],
             )?;
+            println!("pg_ctl successful.");
 
             Ok(()) as Result<()>
         };
@@ -105,7 +105,7 @@ impl PgTemp {
         let version = get_postgres_version()?;
         let db_path = format!("{}/db", self.config_dir);
         run(
-            &format!("/usr/lib/postgresql/{version}/bin/pg_ctl"),
+            &format!("pg_ctl"),
             &["-D", &db_path, "stop"],
         )?;
 
